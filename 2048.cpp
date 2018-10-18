@@ -399,8 +399,7 @@ float score_toplevel_move(board_t board, int move) {
     elapsed = (finish.tv_sec - start.tv_sec);
     elapsed += (finish.tv_usec - start.tv_usec) / 1000000.0;
 
-    printf("Move %d: result %f: eval'd %ld moves (%d cache hits, %d cache size) in %.2f seconds (maxdepth=%d)\n", move, res,
-        state.moves_evaled, state.cachehits, (int)state.trans_table.size(), elapsed, state.maxdepth);
+    //printf("Move %d: result %f: eval'd %ld moves (%d cache hits, %d cache size) in %.2f seconds (maxdepth=%d)\n", move, res,state.moves_evaled, state.cachehits, (int)state.trans_table.size(), elapsed, state.maxdepth);
 
     return res;
 }
@@ -411,8 +410,8 @@ int find_best_move(board_t board) {
     float best = 0;
     int bestmove = -1;
 
-    print_board(board);
-    printf("Current scores: heur %.0f, actual %.0f\n", score_heur_board(board), score_board(board));
+    //print_board(board);
+    //printf("Current scores: heur %.0f, actual %.0f\n", score_heur_board(board), score_board(board));
 
     for(move=0; move<4; move++) {
         float res = score_toplevel_move(board, move);
@@ -485,12 +484,14 @@ static board_t initial_board() {
     return insert_tile_rand(board, draw_tile());
 }
 
-void play_game(get_move_func_t get_move) {
+void play_game(get_move_func_t get_move, int movenum, FILE *fout,int count) {
     board_t board = initial_board();
     int moveno = 0;
     int scorepenalty = 0; // "penalty" for obtaining free 4 tiles
 
-    while(1) {
+	int k, j;
+
+	for (int i = 0; i < movenum;i++) {
         int move;
         board_t newboard;
 
@@ -501,29 +502,72 @@ void play_game(get_move_func_t get_move) {
         if(move == 4)
             break; // no legal moves
 
-        printf("\nMove #%d, current score=%.0f\n", ++moveno, score_board(board) - scorepenalty);
+
+        //printf("\nMove #%d, current score=%.0f\n", ++moveno, score_board(board) - scorepenalty);
 
         move = get_move(board);
         if(move < 0)
             break;
 
+		//print board to file when there is legal move
+		fprintf(fout, "[");
+		board_t tempboard = board;
+		for (k = 0; k<4; k++) {
+			for (j = 0; j<4; j++) {
+				uint8_t powerVal = (tempboard) & 0xf;
+				fprintf(fout, "%u, ", (powerVal == 0) ? 0 : 1 << powerVal);
+				tempboard >>= 4;
+			}
+
+		}
+		if (move == 0) {
+			fprintf(fout,"'w'");
+		}
+		if (move == 1) {
+			fprintf(fout, "'s'");
+		}
+		if (move == 2) {
+			fprintf(fout, "'a'");
+		}
+		if (move == 3) {
+			fprintf(fout, "'d'");
+		}
+		fprintf(fout, "]\n");
         newboard = execute_move(move, board);
         if(newboard == board) {
-            printf("Illegal move!\n");
+            //printf("Illegal move!\n");
             moveno--;
             continue;
         }
+		//printf("so far is ok\n");
 
         board_t tile = draw_tile();
         if (tile == 2) scorepenalty += 4;
         board = insert_tile_rand(newboard, tile);
+		printf("%d ", i);
     }
-
-    print_board(board);
-    printf("\nGame over. Your score is %.0f. The highest rank you achieved was %d.\n", score_board(board) - scorepenalty, get_max_rank(board));
+    //print_board(board);
+    //printf("\nGame over. Your score is %.0f. The highest rank you achieved was %d.\n", score_board(board) - scorepenalty, get_max_rank(board));
+	printf("\nGame %d output finished\n",count+1);
 }
 
 int main() {
     init_tables();
-    play_game(find_best_move);
+	int iter;
+	int i;
+	int movenum;
+	char outputfile[100];
+	printf("Please enter your outputfile name:");
+	scanf("%s", outputfile);
+	printf("Please enter your number of games:");
+	scanf("%d", &iter);
+	printf("Please enter num of moves each game:");
+	scanf("%d", &movenum);
+
+	FILE *fout;
+	fout = fopen(outputfile, "w");
+	for (i = 0; i < iter; i++) {
+		play_game(find_best_move,movenum, fout,i);
+	}
+	fclose(fout);
 }
